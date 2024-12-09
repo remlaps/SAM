@@ -1,0 +1,55 @@
+body {
+    width: 800px;
+    height: 400px;
+    margin: 0;
+    padding: 15px;
+    font-family: Arial, sans-serif;
+    overflow: hidden;
+  }
+  
+  .container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+  
+  .info-panel {
+    margin-bottom: 10px;
+    font-size: 14px;
+  }
+  
+  .info-panel div {
+    margin-bottom: 3px;
+  }
+  
+  .charts-container {
+    display: flex;
+    justify-content: space-between;
+    height: 280px; /* Fixed height for charts container */
+  }
+  
+  .chart-wrapper {
+    width: 48%;
+    position: relative;
+    height: 100%;
+  }
+  
+  .chart-title {
+    text-align: center;
+    margin-top: 5px;
+    font-size: 14px;
+  }
+  
+  #reset-button {
+    margin: 10px auto; /* Center the button horizontally */
+    padding: 8px; /* Padding for the button */
+    cursor: pointer; /* Pointer cursor on hover */
+    display: block; /* Make the button a block element */
+    width: fit-content; /* Make the button width fit its content */
+    text-align: center; /* Center text inside the button */
+  }
+  
+  canvas {
+    width: 100% !important;
+    height: 100% !important;
+  }

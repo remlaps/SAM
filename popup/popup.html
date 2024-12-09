@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <div class="info-panel">
+      <div>Last Irreversible Block: <span id="last-block"></span></div>
+      <div>Blocks Collected: <span id="blocks-collected"></span></div>
+      <div>Last Block Time: <span id="last-block-time"></span></div>
+      <div>Witness: <span id="witness"></span></div>
+      <div>Total Operations: <span id="total-operations"></span></div> <!-- New element for total operations -->
+      <div>Operations Per Second: <span id="operations-per-second"></span></div> <!-- New element for operations per second -->
+    </div>
+    
+    <div class="charts-container">
+      <div class="chart-wrapper">
+        <canvas id="current-block-chart"></canvas>
+        <div class="chart-title">Current Block Transactions</div>
+      </div>
+      <div class="chart-wrapper">
+        <canvas id="total-transactions-chart"></canvas>
+        <div class="chart-title">Total Transactions</div>
+      </div>
+    </div>
+    
+    <button id="reset-button">Reset Counters</button>
+  </div>
+  <script src="../libs/chart.min.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
