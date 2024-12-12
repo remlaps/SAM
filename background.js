@@ -88,10 +88,10 @@ function broadcastUpdate(totalOperations, operationsPerSecond) {
   chrome.runtime.sendMessage(update, (response) => {
     if (chrome.runtime.lastError) {
       // If there was an error, it means the popup is not open or there is no listener
-      console.log('Message could not be sent:', chrome.runtime.lastError.message);
+      // console.log('Message could not be sent:', chrome.runtime.lastError.message);
     } else {
       // Handle successful response if needed
-      console.log('Message sent successfully:', response);
+      // console.log('Message sent successfully:', response);
     }
   });
 }
@@ -131,7 +131,7 @@ async function checkNewBlock() {
     console.warn('Error fetching block data:', error);
   } finally {
     // Schedule the next check
-    setTimeout(checkNewBlock, 1500);
+    setTimeout(checkNewBlock, 500);
   }
 }
 
