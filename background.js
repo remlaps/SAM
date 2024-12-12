@@ -38,95 +38,107 @@ async function fetchBlockOperations(blockNum) {
 }
 
 function processOperations(operations) {
-    currentBlock = {};  
+  currentBlock = {};  
+
+  operations.forEach(op => {
+    const type = op.op[0];
+    currentBlock[type] = (currentBlock[type] || 0) + 1;
+    totalTransactions[type] = (totalTransactions[type] || 0) + 1;
+  });
   
-    operations.forEach(op => {
-      const type = op.op[0];
-      currentBlock[type] = (currentBlock[type] || 0) + 1;
-      totalTransactions[type] = (totalTransactions[type] || 0) + 1;
-    });
-    
-    // Initialize variables to store the producer reward information
-    lastBlockTime = '';
-    witness = '';
+  // Initialize variables to store the producer reward information
+  lastBlockTime = '';
+  witness = '';
+
+  // Find the first operation of type "producer_reward"
+  const producerRewardOp = operations.find(op => op.op[0] === "producer_reward");
   
-    // Find the first operation of type "producer_reward"
-    const producerRewardOp = operations.find(op => op.op[0] === "producer_reward");
-    
-    if (producerRewardOp) {
-      lastBlockTime = producerRewardOp.timestamp; // Get the timestamp from the operation
-      witness = producerRewardOp.op[1].producer || witness; // Get the producer from the operation
+  if (producerRewardOp) {
+    lastBlockTime = producerRewardOp.timestamp; // Get the timestamp from the operation
+    witness = producerRewardOp.op[1].producer || witness; // Get the producer from the operation
+  }
+
+  // Update total operations count
+  totalOperations += operations.length;
+
+  // Calculate operations per second
+  let operationsPerSecond = totalOperations / ((blocksCollected + 1) * 3); // Calculate operations per second
+  operationsPerSecond = operationsPerSecond.toFixed(2);
+
+  // Return the total operations and operations per second
+  return { totalOperations, operationsPerSecond };
+}
+
+function broadcastUpdate(totalOperations, operationsPerSecond) {
+  const update = {
+    type: 'update',
+    currentBlock, // This should be the latest block's transaction counts
+    totalTransactions, // This should be the total transaction counts
+    info: {
+      lastBlock,
+      blocksCollected,
+      lastBlockTime,
+      witness,
+      totalOperations, // Include total operations
+      operationsPerSecond // Include operations per second
     }
+  };
   
-    // Update total operations count
-    totalOperations += operations.length;
-
-    // Calculate operations per second
-    let operationsPerSecond = totalOperations / ((blocksCollected + 1) * 3); // Calculate operations per second
-    operationsPerSecond = operationsPerSecond.toFixed(2);
-
-    // Return the total operations and operations per second
-    return { totalOperations, operationsPerSecond };
-  }
-
-  function broadcastUpdate(totalOperations, operationsPerSecond) {
-    const update = {
-      type: 'update',
-      currentBlock, // This should be the latest block's transaction counts
-      totalTransactions, // This should be the total transaction counts
-      info: {
-        lastBlock,
-        blocksCollected,
-        lastBlockTime,
-        witness,
-        totalOperations, // Include total operations
-        operationsPerSecond // Include operations per second
-      }
-    };
-    
-    chrome.runtime.sendMessage(update);
-  }
+  // Send the message and handle the response
+  chrome.runtime.sendMessage(update, (response) => {
+    if (chrome.runtime.lastError) {
+      // If there was an error, it means the popup is not open or there is no listener
+      console.log('Message could not be sent:', chrome.runtime.lastError.message);
+    } else {
+      // Handle successful response if needed
+      console.log('Message sent successfully:', response);
+    }
+  });
+}
 
 async function checkNewBlock() {
-    try {
-      const newLastBlock = await fetchGlobalProperties();
-  
-      // If this is the first fetch, set the next block to check
-      if (lastBlock === 0) {
-        lastBlock = newLastBlock; // Set lastBlock to the fetched value
-        nextBlockToCheck = lastBlock + 1; // Set the next block to check
-        console.log(`Initial last irreversible block: ${lastBlock}`);
-      } else {
-        // Increment the block number to check
-        if (nextBlockToCheck > lastBlock) {
-          console.log('Waiting for the last irreversible block to catch up...');
-          
-          // Sleep for 1 second before fetching the last irreversible block again
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-          lastBlock = await fetchGlobalProperties(); // Fetch the last irreversible block again
-          return; // Wait for the last irreversible block to catch up
-        }
-  
-        // Check the next block
-        const operations = await fetchBlockOperations(nextBlockToCheck);
-        const { totalOperations, operationsPerSecond } = processOperations(operations); // Call processOperations with operations
+  try {
+    const newLastBlock = await fetchGlobalProperties();
+
+    // If this is the first fetch, set the next block to check
+    if (lastBlock === 0) {
+      lastBlock = newLastBlock; // Set lastBlock to the fetched value
+      nextBlockToCheck = lastBlock + 1; // Set the next block to check
+      console.log(`Initial last irreversible block: ${lastBlock}`);
+    } else {
+      // Increment the block number to check
+      if (nextBlockToCheck > lastBlock) {
+        console.log('Waiting for the last irreversible block to catch up...');
         
-        // Update lastBlock only if new block is processed
-        lastBlock = nextBlockToCheck; 
-        blocksCollected++;
-        nextBlockToCheck++; // Increment the block number to check for the next iteration
-        broadcastUpdate(totalOperations, operationsPerSecond); // Pass the metrics to broadcastUpdate
+        // Sleep for 1 second before fetching the last irreversible block again
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        lastBlock = await fetchGlobalProperties(); // Fetch the last irreversible block again
+        return; // Wait for the last irreversible block to catch up
       }
-    } catch (error) {
-      console.warn('Error fetching block data:', error);
+
+      // Check the next block
+      const operations = await fetchBlockOperations(nextBlockToCheck);
+      const { totalOperations, operationsPerSecond } = processOperations(operations); // Call processOperations with operations
+      
+      // Update lastBlock only if new block is processed
+      lastBlock = nextBlockToCheck; 
+      blocksCollected++;
+      nextBlockToCheck++; // Increment the block number to check for the next iteration
+      broadcastUpdate(totalOperations, operationsPerSecond); // Pass the metrics to broadcastUpdate
     }
+  } catch (error) {
+    console.warn('Error fetching block data:', error);
+  } finally {
+    // Schedule the next check
+    setTimeout(checkNewBlock, 1500);
   }
+}
 
 async function retryFetchBlock(expectedBlock) {
   for (let i = 0; i < maxRetries; i++) {
     console.log(`Retrying to fetch block ${expectedBlock}... Attempt ${i + 1}`);
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for 1 second
+    await new Promise(resolve => setTimeout(resolve, 500)); // Wait for 1 second
 
     const newLastBlock = await fetchGlobalProperties();
     
@@ -153,7 +165,7 @@ function reset() {
 }
 
 // Start monitoring
-setInterval(checkNewBlock, 1500);
+checkNewBlock(); // Start the first check
 
 // Handle messages from popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
