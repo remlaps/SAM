@@ -4,6 +4,7 @@
   "version": "1.0",
   "description": "Monitor Steem blockchain activity with real-time transaction charts",
   "permissions": [
+    "alarms",
     "storage"
   ],
   "background": {

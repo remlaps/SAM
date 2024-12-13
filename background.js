@@ -83,7 +83,18 @@ function broadcastUpdate(totalOperations, operationsPerSecond) {
       operationsPerSecond // Include operations per second
     }
   };
-  
+
+  if (lastBlock % 7 === 0) {
+    // Store the update in Chrome local storage
+    chrome.storage.local.set({ update }, () => {
+      if (chrome.runtime.lastError) {
+        // console.error('Error storing update in local storage:', chrome.runtime.lastError);
+      } else {
+        // console.log('Update stored in local storage successfully.');
+      }
+    });
+  }
+
   // Send the message and handle the response
   chrome.runtime.sendMessage(update, (response) => {
     if (chrome.runtime.lastError) {
@@ -91,7 +102,6 @@ function broadcastUpdate(totalOperations, operationsPerSecond) {
       // console.log('Message could not be sent:', chrome.runtime.lastError.message);
     } else {
       // Handle successful response if needed
-      // console.log('Message sent successfully:', response);
     }
   });
 }
@@ -110,7 +120,7 @@ async function checkNewBlock() {
       if (nextBlockToCheck > lastBlock) {
         console.log('Waiting for the last irreversible block to catch up...');
         
-        // Sleep for 1 second before fetching the last irreversible block again
+        // Sleep before fetching the last irreversible block again
         await new Promise(resolve => setTimeout(resolve, 500));
         
         lastBlock = await fetchGlobalProperties(); // Fetch the last irreversible block again
