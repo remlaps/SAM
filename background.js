@@ -8,13 +8,18 @@ let retryCount = 0; // To keep track of retries
 const maxRetries = 10; // Maximum number of retries
 let nextBlockToCheck = 0; // Variable to track the next block to check
 let totalOperations = 0; // Variable to track total operations
+let isSaving = false; // Lock to prevent multiple saves
+let isUpdating = false; // Lock to prevent multiple updates
+let apiUrl = "https://api.moecki.online"; // Default API URL
+let isPaused = true; // Track the pause state (start paused to prevent runaway collection)
+
 
 chrome.action.onClicked.addListener(tab => {
     chrome.tabs.create({ url: "popup/popup.html" });
 });
 
 async function fetchGlobalProperties() {
-    const response = await fetch('https://api.moecki.online', {
+    const response = await fetch(apiUrl, {
         method: 'POST',
         body: JSON.stringify({
             jsonrpc: '2.0',
@@ -32,7 +37,7 @@ function getLastIrreversibleBlockNum(globalProperties) {
 }
 
 async function fetchBlockOperations(blockNum) {
-    const response = await fetch('https://api.moecki.online', {
+    const response = await fetch(apiUrl, {
         method: 'POST',
         body: JSON.stringify({
             jsonrpc: '2.0',
@@ -107,25 +112,11 @@ function broadcastUpdate(totalOperations, operationsPerSecond) {
             operationsPerSecond // Include operations per second
         }
     };
-
-    if (lastBlock % 7 === 0) {
-        // Store the update in Chrome local storage
-        chrome.storage.local.set({ update }, () => {
-            if (chrome.runtime.lastError) {
-                // console.error('Error storing update in local storage:', chrome.runtime.lastError);
-            } else {
-                // console.log('Update stored in local storage successfully.');
-            }
-        });
-    }
-
-    // Send the message and handle the response
-    chrome.runtime.sendMessage(update, (response) => {
+    chrome.runtime.sendMessage(update, response => {
         if (chrome.runtime.lastError) {
-            // If there was an error, it means the popup is not open or there is no listener
-            // console.log('Message could not be sent:', chrome.runtime.lastError.message);
+            // console.error('Error sending message:', chrome.runtime.lastError);
         } else {
-            // Handle successful response if needed
+            // console.log('Message sent successfully:', response);
         }
     });
 }
@@ -158,7 +149,19 @@ async function fetchWithRetry(blockNum, maxRetries = 15) {
 }
 
 // Usage in your checkNewBlock function
+// Update checkNewBlocks to respect the pause state
 async function checkNewBlocks() {
+    if (isPaused) {
+        return; // Skip checking new blocks if paused
+    }
+
+    if (isSaving || isUpdating) {
+        return; // Prevent checking new blocks if a save or reset is in progress
+    }
+    isUpdating = true;
+
+    await retrieveData();
+
     try {
         // If this is the first fetch, set the next block to check
         if (lastBlock === 0) {
@@ -166,7 +169,10 @@ async function checkNewBlocks() {
             const newLastBlock = getLastIrreversibleBlockNum(globalProperties);
             lastBlock = newLastBlock;
             nextBlockToCheck = lastBlock + 1;
-            console.log(`Initial last irreversible block: ${lastBlock}`);
+            // console.log(`Initial last irreversible block: ${lastBlock}`);
+            isUpdating = false;
+            // Save data at the end of the function
+            await saveData();
             return;
         }
 
@@ -187,23 +193,90 @@ async function checkNewBlocks() {
                 break;
             }
             const globalProperties = await fetchGlobalProperties();
-            lastBlock = getLastIrreversibleBlockNum(globalProperties);        }
+            lastBlock = getLastIrreversibleBlockNum(globalProperties);
+        }
     } catch (error) {
         console.warn('Error fetching block data:', error);
     }
+
     console.log(`Waiting for the last irreversible block to catch up: ${nextBlockToCheck} > ${lastBlock}`);
+    await saveData();
+    isUpdating = false;
 }
 
 checkNewBlocks();
 // Call checkNewBlock periodically
 setInterval(checkNewBlocks, 1500); // Check every 1.5 seconds
 
-function reset() {
+async function saveData() {
+    const dataToSave = {
+        lastBlock,
+        blocksCollected,
+        totalTransactions,
+        currentBlock,
+        lastBlockTime,
+        witness,
+        totalOperations,
+        nextBlockToCheck
+    };
+    await chrome.storage.local.set({ blockchainData: dataToSave });
+    // console.log('Data saved to storage:', dataToSave);
+}
+
+async function retrieveData() {
+    const result = await chrome.storage.local.get('blockchainData');
+    if (result.blockchainData) {
+        let { lastBlock, blocksCollected, totalTransactions, currentBlock, lastBlockTime, witness, totalOperations, nextBlockToCheck } = result.blockchainData;
+        // Restore the values
+        lastBlock = lastBlock;
+        blocksCollected = blocksCollected;
+        totalTransactions = totalTransactions;
+        currentBlock = currentBlock;
+        lastBlockTime = lastBlockTime;
+        witness = witness;
+        totalOperations = totalOperations;
+        nextBlockToCheck = nextBlockToCheck;
+        // console.log('Data retrieved from storage:', result.blockchainData);
+    } else {
+        // console.log('No data found in storage.');
+    }
+}
+
+async function reset() {
+    if (isSaving || isUpdating) {
+        console.warn('Cannot reset while saving or updating.');
+        return; // Prevent reset if a save or update is in progress
+    }    
+    isSaving = true;
+
+    // Reset the state
     blocksCollected = 0;
     totalTransactions = {};
     currentBlock = {};
-    broadcastUpdate();
     totalOperations = 0;
+    lastBlock = 0;
+    lastBlockTime = '';
+    witness = '';
+
+    try {
+        await saveData(); // Wait for the data to be saved
+
+        // Broadcast the update after saving
+        broadcastUpdate();
+        
+        // Notify the popup to refresh data
+        chrome.runtime.sendMessage({ type: 'dataUpdated' }, response => {
+            if (chrome.runtime.lastError) {
+                // console.error('Error sending message:', chrome.runtime.lastError);
+            } else {
+                // console.log('Message sent successfully:', response);
+            }
+        });
+    } catch (error) {
+        console.error('Error saving data after reset:', error);
+    } finally {
+        isSaving = false; // Release the lock
+    }
 }
 
 // Handle messages from popup
@@ -221,5 +294,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         });
     } else if (message.type === 'reset') {
         reset();
+    } else if (message.type === 'setApi') {
+        apiUrl = message.apiUrl; // Update the API URL based on user selection
+        // console.log(`API URL set to: ${apiUrl}`);
+    } else if (message.type === 'togglePauseState') {
+        isPaused = message.isPaused; // Update the pause state
+        // console.log(`Data collection is now ${isPaused ? 'paused' : 'running'}.`);
     }
+});
+
+// Listen for the extension being installed or updated
+chrome.runtime.onInstalled.addListener(() => {
+    // Set isPaused to false when the extension is reloaded
+    isPaused = true;
+    chrome.storage.local.set({ isPaused: isPaused });
 });

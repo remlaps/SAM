@@ -39,15 +39,22 @@ body {
     margin-top: 5px;
     font-size: 14px;
   }
-  
-  #reset-button {
-    margin: 10px auto; /* Center the button horizontally */
-    padding: 8px; /* Padding for the button */
+
+  .button-container {
+    display: flex; /* Use flexbox for layout */
+    gap: 10px; /* Optional: Add some space between the buttons */
+    margin-bottom: 10px; /* Space below the button container */
+    text-align:center;
+    justify-content: center;
+}
+
+#reset-button,
+#toggle-button {
+    padding: 8px; /* Padding for the buttons */
     cursor: pointer; /* Pointer cursor on hover */
-    display: block; /* Make the button a block element */
     width: fit-content; /* Make the button width fit its content */
     text-align: center; /* Center text inside the button */
-  }
+}
   
   canvas {
     width: 100% !important;

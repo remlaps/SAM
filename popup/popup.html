@@ -1,9 +1,11 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <meta charset="UTF-8">
   <link rel="stylesheet" href="popup.css">
 </head>
+
 <body>
   <div class="container">
     <div class="info-panel">
@@ -14,7 +16,17 @@
       <div>Total Operations: <span id="total-operations"></span></div>
       <div>Operations Per Second: <span id="operations-per-second"></span></div>
     </div>
-    
+
+    <div>
+      <label for="api-select">Select API:</label>
+      <select id="api-select">
+        <option value="https://api.steemit.com">Steemit API</option>
+        <option value="https://api.moecki.online">Moecki API</option>
+        <option value="https://api.pennsif.net">Pennsif API</option>
+        <option value="https://api.steememory.com">Steememory API</option>
+      </select>
+    </div>
+
     <div class="charts-container">
       <div class="chart-wrapper">
         <canvas id="current-block-chart"></canvas>
@@ -25,10 +37,13 @@
         <div class="chart-title">Total Transactions</div>
       </div>
     </div>
-    
-    <button id="reset-button">Reset Counters</button>
+    <div class="button-container">
+      <button id="toggle-button">Start Collection</button>
+      <button id="reset-button">Reset Counters</button>
+    </div>
   </div>
   <script src="../libs/chart.min.js" defer></script>
   <script src="popup.js" defer></script>
 </body>
+
 </html>
