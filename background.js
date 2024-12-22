@@ -303,9 +303,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 });
 
+
+/*
+ * Avoid runaway data collection.  The user must start collection manually.
+ */
 // Listen for the extension being installed or updated
 chrome.runtime.onInstalled.addListener(() => {
-    // Set isPaused to false when the extension is reloaded
+    // Set isPaused to true when the extension is reloaded
+    isPaused = true;
+    chrome.storage.local.set({ isPaused: isPaused });
+});
+
+chrome.runtime.onStartup.addListener(() => {
+    // Set isPaused to true when the browser restarts
     isPaused = true;
     chrome.storage.local.set({ isPaused: isPaused });
 });
